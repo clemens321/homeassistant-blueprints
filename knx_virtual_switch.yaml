@@ -23,54 +23,43 @@ blueprint:
 variables:
   address: !input address
 trigger:
-- platform: homeassistant
-  event: start
-- platform: event
-  event_type: automation_reloaded
-- platform: event
-  event_type: knx_event
-  event_data:
-    destination: !input address
+  - platform: homeassistant
+    event: start
+  - platform: event
+    event_type: event_knx_reloaded
+  - platform: event
+    event_type: automation_reloaded
+  - platform: event
+    event_type: knx_event
+    event_data:
+      destination: !input address
+    id: knx_event
 action:
-- choose:
-  - conditions:
-    - condition: template
-      value_template: '{{ trigger is defined and trigger.platform == "event" and trigger.event.event_type
-        == "knx_event" }}'
-    sequence:
-    - choose:
-      - conditions:
-        - condition: template
-          value_template: '{{ trigger.event.data.destination == address and trigger.event.data.data
-            == 1 }}'
-        sequence:
-        - service: homeassistant.turn_on
-          data:
-            entity_id: !input target_entity
-      - conditions:
-        - condition: template
-          value_template: '{{ trigger.event.data.destination == address and trigger.event.data.data
-            == 0 }}'
-        sequence:
-        - service: homeassistant.turn_off
-          data:
-            entity_id: !input target_entity
-  - conditions:
-    - condition: or
-      conditions:
-      - condition: template
-        value_template: '{{ trigger is not defined }}'
-      - condition: template
-        value_template: '{{ trigger.platform == "homeassistant" }}'
-      - condition: template
-        value_template: '{{ trigger.platform == "event" and trigger.event.event_type
-          == "automation_reloaded" }}'
-    sequence:
-    - service: knx.event_register
-      data:
-        address: '{{ address }}'
-    - service: knx.exposure_register
-      data:
-        address: !input state_address
-        type: binary
-        entity_id: !input target_entity
+  - if:
+      - condition: trigger
+        id: knx_event
+    then:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.event.data.destination == address and trigger.event.data.data == 1 }}"
+            sequence:
+              - service: homeassistant.turn_on
+                data:
+                  entity_id: !input target_entity
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.event.data.destination == address and trigger.event.data.data == 0 }}"
+            sequence:
+              - service: homeassistant.turn_off
+                data:
+                  entity_id: !input target_entity
+    else:
+      - service: knx.event_register
+        data:
+          address: "{{ address }}"
+      - service: knx.exposure_register
+        data:
+          address: !input state_address
+          type: binary
+          entity_id: !input target_entity
