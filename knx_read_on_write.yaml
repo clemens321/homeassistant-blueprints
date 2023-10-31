@@ -1,0 +1,55 @@
+blueprint:
+  name: KNX GA-Read on GA-Write
+  description: Trigger a group value read if a group value write on another group address is received
+  domain: automation
+  input:
+    event_addresses:
+      name: Event addresses
+      description: KNX group addresses to wait for a write telegram
+      selector:
+        object:
+    send_addresses:
+      name: Send addresses
+      description:
+        KNX group addresses to trigger a GroupValueRead when receiving a write on one of the previous group addresses.
+        Index has to match the event address list
+      selector:
+        object:
+  source_url: https://github.com/clemens321/homeassistant-blueprints/blob/main/knx_read_on_write.yaml
+variables:
+  event_addresses: !input event_addresses
+  send_addresses: !input send_addresses
+trigger:
+  - platform: homeassistant
+    event: start
+  - platform: event
+    event_type: event_knx_reloaded
+  - platform: event
+    event_type: automation_reloaded
+  - platform: event
+    event_type: knx_event
+    event_data:
+      telegramtype: GroupValueWrite
+    id: knx_event
+action:
+  - if:
+      - condition: trigger
+        id: knx_event
+    then:
+      - variables:
+          send_address: |-
+            {% for search_address in event_addresses -%}
+            {% if search_address == trigger.event.data.destination -%}
+            {{ send_addresses[loop.index0] }}
+            {% endif -%}
+            {% endfor -%}
+      - condition: template
+        value_template: "{{ send_address != '' }}"
+      - service: knx.read
+        data:
+          address: "{{ send_address }}"
+    else:
+      - service: knx.event_register
+        data:
+          remove: false
+          address: !input event_addresses
