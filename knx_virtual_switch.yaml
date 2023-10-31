@@ -8,7 +8,8 @@ blueprint:
       description: KNX group address for switching the entity on and off. DPT 1.001
     state_address:
       name: State Address
-      description: KNX group address for exposing the switch state of the entity.
+      description:
+        KNX group address for exposing the switch state of the entity.
         DPT 1.001
     target_entity:
       name: Entity
