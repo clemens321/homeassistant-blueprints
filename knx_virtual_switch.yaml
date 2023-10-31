@@ -16,11 +16,11 @@ blueprint:
       description: The entity to keep in sync.
       selector:
         entity:
-          domain:
-          - light
-          - switch
-          - input_boolean
-          multiple: false
+          filter:
+            domain:
+              - light
+              - switch
+              - input_boolean
   source_url: https://github.com/clemens321/homeassistant-blueprints/blob/main/knx_virtual_switch.yaml
 variables:
   address: !input address
