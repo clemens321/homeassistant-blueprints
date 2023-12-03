@@ -1,0 +1,24 @@
+blueprint:
+  name: KNX GA-Read on reload
+  description: Trigger a group value read if the integration is reloaded
+  domain: automation
+  input:
+    read_addresses:
+      name: Read addresses
+      description: KNX group addresses to trigger ad GroupValueRead
+      selector:
+        object:
+  source_url: https://github.com/clemens321/homeassistant-blueprints/blob/main/knx_read_on_reload.yaml
+variables:
+  read_addresses: !input read_addresses
+trigger:
+  - platform: homeassistant
+    event: start
+  - platform: event
+    event_type: event_knx_reloaded
+  - platform: event
+    event_type: automation_reloaded
+action:
+  - service: knx.read
+    data:
+      address: "{{ read_addresses }}"
