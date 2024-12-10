@@ -1,0 +1,137 @@
+blueprint:
+  name: MHI AC Offset-Adjuster
+  description: Vergleicht die Raumtemperatur mit der Raumsolltemperatur und passt den Offset für die zur Klimaanlage gemeldeten Ist-Temperatur unter Berücksichtigung der Lüftergeschwindigkeit automatisch an.
+  domain: automation
+  input:
+    mhi_ac_offset:
+      name: MHI Temperatur-Offset
+      description: Hilfsentität für den Offset zwischen Ist- und Solltemperatur
+      selector:
+        entity:
+          filter:
+            domain: input_number
+    room_climate:
+      name: Raumsteuerung
+      description: Klima-Entität für die Raumsteuerung (KNX), hier wird die aktuelle Temperatur gelesen
+      selector:
+        entity:
+          filter:
+            domain: climate
+    mhi_ac_climate:
+      name: MHI Klima
+      description: Entität der MHI Klimaanlage für die Solltemperatur
+      selector:
+        entity:
+          filter:
+            domain: climate
+    mhi_ac_fanspeed:
+      name: MHI Lüftergeschwindigkeit
+      description: Lüftergeschwindigkeit der Inneneinheit sollte als eigene Sensor-Entität vorliegen
+      selector:
+        entity:
+          filter:
+            domain: sensor
+    neigung:
+      name: Neigung
+      description: Beschreibt, wie stark die Lüftergeschwindigkeit Einfluss auf die Temperatur nimmt
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.1
+      default: 0.3
+    niveau:
+      name: Niveau
+      description: Abstand der unteren Grenze
+      selector:
+        number:
+          min: 0
+          max: 2
+          step: 0.1
+      default: 0.5
+    hysterese:
+      name: Hysterese
+      description: Temperaturbereich, in dem nichts geändert wird
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.1
+      default: 0.5
+    min_offset:
+      name: Mindest Offset
+      description: Mindest-Offset, welches automatisch nicht unterschritten wird
+      selector:
+        number:
+          min: 0
+          max: 3
+          step: 0.1
+      default: 0
+    max_offset:
+      name: Maximaler Offset
+      description: Größter Offset, welches automatisch nicht überschritten wird
+      selector:
+        number:
+          min: 1
+          max: 5
+          step: 0.1
+      default: 3
+  source_url: https://github.com/clemens321/homeassistant-blueprints/blob/main/mhi_ac_offset.yaml
+variables:
+  # Die Zuweisung zu Variablen ist nötig um innerhalb von Templates auf die Werte zugreifen zu können
+  room_climate: !input room_climate
+  mhi_ac_climate: !input mhi_ac_climate
+  mhi_ac_fanspeed: !input mhi_ac_fanspeed
+  neigung: !input neigung
+  niveau: !input niveau
+  hysterese: !input hysterese
+  min_offset: !input min_offset
+  max_offset: !input max_offset
+triggers:
+  - trigger: time_pattern
+    minutes: /4
+conditions:
+  - condition: state
+    entity_id: !input mhi_ac_climate
+    state:
+      - heat_cool
+      - heat
+      - cool
+actions:
+  - choose:
+      - conditions:
+          - condition: numeric_state
+            entity_id: !input mhi_ac_offset
+            above: 0
+            value_template: "{{ state.state | float - min_offset }}"
+          - condition: template
+            value_template: |-
+              {{ state_attr(room_climate, 'current_temperature') | float
+              < state_attr(mhi_ac_climate, 'temperature') | float
+              + niveau
+              - neigung * states(mhi_ac_fanspeed) | int
+              }}
+        sequence:
+          - action: input_number.decrement
+            metadata: {}
+            data: {}
+            target:
+              entity_id: !input mhi_ac_offset
+      - conditions:
+          - condition: numeric_state
+            entity_id: !input mhi_ac_offset
+            value_template: "{{ state.state | float - max_offset }}"
+            below: 0
+          - condition: template
+            value_template: |-
+              {{ state_attr(room_climate, 'current_temperature') | float
+              > state_attr(mhi_ac_climate, 'temperature') | float
+              + niveau + hysterese
+              - neigung * states(mhi_ac_fanspeed) | int
+              }}
+        sequence:
+          - action: input_number.increment
+            metadata: {}
+            data: {}
+            target:
+              entity_id: !input mhi_ac_offset
